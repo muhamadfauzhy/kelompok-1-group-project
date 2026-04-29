@@ -5,7 +5,7 @@ const { createServer } = require("node:http");
 const { Server } = require("socket.io");
 const { PORT, CLIENT_ORIGINS } = require("./src/config");
 const { createRoomStore } = require("./src/store/roomStore");
-const { createGeminiNarrator } = require("./src/services/geminiNarrator");
+const { createOpenAINarrator } = require("./src/services/openaiNarrator");
 const { createGameEngine } = require("./src/game/gameEngine");
 const { registerSocketHandlers } = require("./src/socket/registerSocketHandlers");
 
@@ -19,7 +19,7 @@ const io = new Server(server, {
 });
 
 const roomStore = createRoomStore();
-const narrator = createGeminiNarrator();
+const narrator = createOpenAINarrator();
 const gameEngine = createGameEngine({ io, roomStore, narrator });
 
 app.get("/", (req, res) => {
