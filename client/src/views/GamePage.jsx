@@ -1,6 +1,5 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { LanguageContext } from "../context/languageContext";
 import { socket } from "../socket/socket";
 
 function useCountdown(phaseEndsAt) {
@@ -41,28 +40,45 @@ function toneClass(tone) {
   return "feed-card";
 }
 
-function formatPayload(payload) {
-  if (!payload) {
-    return "";
-  }
+function getPhaseLabel(phase) {
+  const labels = {
+    lobby: "LOBBY",
+    night: "NIGHT",
+    discussion: "DISCUSSION",
+    voting: "VOTING",
+    ended: "ENDED",
+  };
 
-  try {
-    return JSON.stringify(payload, null, 2);
-  } catch {
-    return String(payload);
-  }
+  return labels[phase] || phase || "-";
+}
+
+function getStatusLabel(status) {
+  const labels = {
+    lobby: "Lobby",
+    playing: "Playing",
+    ended: "Ended",
+  };
+
+  return labels[status] || status || "-";
+}
+
+function getRoleLabel(role) {
+  const labels = {
+    villager: "Villager",
+    seer: "Seer",
+    werewolf: "Werewolf",
+  };
+
+  return labels[role] || "Hidden";
 }
 
 export default function GamePage() {
   const navigate = useNavigate();
-  const { copy, getDirectionLabel, getPhaseLabel, getRoleLabel, getStatusLabel } =
-    useContext(LanguageContext);
   const [room, setRoom] = useState(null);
   const [roomSummary, setRoomSummary] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [privateNote, setPrivateNote] = useState("");
-  const [eventLogs, setEventLogs] = useState([]);
   const usernameRef = useRef(sessionStorage.getItem("username") || "");
   const roomCodeRef = useRef(sessionStorage.getItem("roomCode") || "");
   const roomActionRef = useRef(sessionStorage.getItem("roomAction") || "");
@@ -71,23 +87,6 @@ export default function GamePage() {
   const countdown = useCountdown(room?.phaseEndsAt ?? null);
   const alivePlayers = room?.players?.filter((player) => player.alive) || [];
 
-  function pushEventLog(eventName, payload = null, direction = "in") {
-    setEventLogs((current) => {
-      const next = [
-        {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          eventName,
-          payload: formatPayload(payload),
-          direction,
-          timestamp: new Date().toLocaleTimeString(),
-        },
-        ...current,
-      ];
-
-      return next.slice(0, 40);
-    });
-  }
-
   useEffect(() => {
     if (!usernameRef.current.trim()) {
       navigate("/");
@@ -95,8 +94,6 @@ export default function GamePage() {
     }
 
     function handleConnect() {
-      pushEventLog("connect", { socketId: socket.id }, "in");
-
       if (hasRequestedRef.current) {
         return;
       }
@@ -105,27 +102,14 @@ export default function GamePage() {
 
       if (roomActionRef.current === "create") {
         socket.emit("room:create");
-        pushEventLog("room:create", null, "out");
       }
 
       if (roomActionRef.current === "join") {
         socket.emit("room:join", roomCodeRef.current);
-        pushEventLog("room:join", roomCodeRef.current, "out");
       }
     }
 
     function handleRoomState(nextRoom) {
-      pushEventLog(
-        "room:state",
-        {
-          code: nextRoom?.code,
-          phase: nextRoom?.phase,
-          status: nextRoom?.status,
-          round: nextRoom?.round,
-          players: nextRoom?.players?.length,
-        },
-        "in"
-      );
       setRoom(nextRoom);
       setError("");
       if (nextRoom?.code) {
@@ -135,23 +119,21 @@ export default function GamePage() {
     }
 
     function handleRoomSummary(nextSummary) {
-      pushEventLog("room:summary", nextSummary, "in");
       setRoomSummary(nextSummary);
     }
 
     function handleRoomError(nextError) {
-      pushEventLog("room:error", { message: nextError }, "in");
       setError(nextError);
     }
 
     function handlePrivateNote(note) {
-      pushEventLog("private:note", { note }, "in");
       setPrivateNote(note);
     }
 
     function handleConnectError(connectError) {
-      pushEventLog("connect_error", { message: connectError.message }, "in");
-      setError(copy.game.socketConnectionError(connectError.message));
+      setError(
+        `Gagal terhubung ke server socket (${connectError.message || "unknown error"}). Pastikan server berjalan di port 3001.`
+      );
     }
 
     socket.auth = { username: usernameRef.current };
@@ -173,7 +155,7 @@ export default function GamePage() {
       socket.off("connect_error", handleConnectError);
       socket.disconnect();
     };
-  }, [copy.game, navigate]);
+  }, [navigate]);
 
   function leaveGame() {
     socket.disconnect();
@@ -194,32 +176,30 @@ export default function GamePage() {
     }
 
     socket.emit("chat:send", message);
-    pushEventLog("chat:send", { message }, "out");
     setMessage("");
   }
 
   function handleStartGame() {
     socket.emit("game:start");
-    pushEventLog("game:start", null, "out");
   }
 
   function handleNightTarget(targetId) {
     socket.emit("night:action", targetId);
-    pushEventLog("night:action", { targetId }, "out");
   }
 
   function handleVoteTarget(targetId) {
     socket.emit("vote", { targetId });
-    pushEventLog("vote", { targetId }, "out");
   }
 
   if (!room) {
     return (
       <main className="shell">
         <section className="hero-panel">
-          <div className="eyebrow">{copy.game.connectingEyebrow}</div>
-          <h1>{copy.game.preparingRoomTitle}</h1>
-          <p className="hero-copy">{error || copy.game.waitingForRoom}</p>
+          <div className="eyebrow">Connecting</div>
+          <h1>Preparing Room</h1>
+          <p className="hero-copy">
+            {error || "Connecting to the werewolf server and waiting for room state."}
+          </p>
         </section>
       </main>
     );
@@ -236,49 +216,47 @@ export default function GamePage() {
       <aside className="sidebar">
         <div className="room-header">
           <div>
-            <div className="eyebrow">{copy.game.roomCode}</div>
+            <div className="eyebrow">Room Code</div>
             <div className="room-code">{room.code}</div>
           </div>
           <button className="ghost-btn" onClick={leaveGame}>
-            {copy.common.leave}
+            Leave
           </button>
         </div>
 
         <div className="role-card">
-          <div className="eyebrow">{copy.game.yourRole}</div>
+          <div className="eyebrow">Your Role</div>
           <div className="role-name">{getRoleLabel(room.me?.role)}</div>
-          <div className="role-status">
-            {room.me?.alive ? copy.common.aliveStatus : copy.common.eliminatedStatus}
-          </div>
+          <div className="role-status">{room.me?.alive ? "Alive" : "Eliminated"}</div>
         </div>
 
         {privateNote ? (
           <div className="private-card">
-            <div className="eyebrow">{copy.common.privateNote}</div>
+            <div className="eyebrow">Private Note</div>
             <p>{privateNote}</p>
           </div>
         ) : room.me?.nightResult ? (
           <div className="private-card">
-            <div className="eyebrow">{copy.common.privateNote}</div>
+            <div className="eyebrow">Private Note</div>
             <p>{room.me.nightResult}</p>
           </div>
         ) : null}
 
         <div className="player-list">
-          <div className="eyebrow">{copy.game.players}</div>
+          <div className="eyebrow">Players</div>
           {room.players.map((player) => (
             <article key={player.id} className="player-card">
               <div className="player-top">
                 <strong>
                   {player.username}
-                  {player.id === room.me?.id ? ` (${copy.common.you})` : ""}
+                  {player.id === room.me?.id ? " (You)" : ""}
                 </strong>
                 <span className={player.alive ? "alive-pill" : "dead-pill"}>
-                  {player.alive ? copy.common.aliveStatus : copy.common.outStatus}
+                  {player.alive ? "Alive" : "Out"}
                 </span>
               </div>
               <div className="player-meta">
-                {player.isHost ? copy.common.host : copy.common.player}
+                {player.isHost ? "Host" : "Player"}
                 {room.status === "ended" && player.role ? ` - ${getRoleLabel(player.role)}` : ""}
               </div>
             </article>
@@ -289,17 +267,17 @@ export default function GamePage() {
       <section className="main-stage">
         <div className="phase-card">
           <div className="phase-copy">
-            <div className="eyebrow">{copy.game.phase}</div>
+            <div className="eyebrow">Phase</div>
             <h2>{getPhaseLabel(room.phase)}</h2>
             <p>{room.narration}</p>
           </div>
           <div className="phase-side">
             <div className="timer-label">
-              {room.phaseEndsAt ? copy.common.secondsLeft(countdown) : getStatusLabel(room.status)}
+              {room.phaseEndsAt ? `${countdown}s left` : getStatusLabel(room.status)}
             </div>
             {canStart ? (
               <button className="primary-btn" onClick={handleStartGame}>
-                {copy.common.startGame}
+                Start Game
               </button>
             ) : null}
           </div>
@@ -308,31 +286,31 @@ export default function GamePage() {
         {error ? <div className="error-banner stage-error">{error}</div> : null}
 
         <section className="action-card">
-          <div className="eyebrow">{copy.game.socketSummary}</div>
-          <h3>{copy.game.broadcastPreview}</h3>
+          <div className="eyebrow">Socket Summary</div>
+          <h3>Server Broadcast Preview</h3>
           <div className="summary-grid">
             <div className="summary-item">
-              <span>{copy.common.room}</span>
+              <span>Room</span>
               <strong>{roomSummary?.code || room.code}</strong>
             </div>
             <div className="summary-item">
-              <span>{copy.common.status}</span>
+              <span>Status</span>
               <strong>{getStatusLabel(roomSummary?.status || room.status)}</strong>
             </div>
             <div className="summary-item">
-              <span>{copy.common.phase}</span>
+              <span>Phase</span>
               <strong>{getPhaseLabel(roomSummary?.phase || room.phase)}</strong>
             </div>
             <div className="summary-item">
-              <span>{copy.common.players}</span>
+              <span>Players</span>
               <strong>{roomSummary?.playerCount || room.players.length}</strong>
             </div>
             <div className="summary-item">
-              <span>{copy.common.alive}</span>
+              <span>Alive</span>
               <strong>{roomSummary?.aliveCount || room.aliveCount}</strong>
             </div>
             <div className="summary-item">
-              <span>{copy.common.round}</span>
+              <span>Round</span>
               <strong>{roomSummary?.round || room.round}</strong>
             </div>
           </div>
@@ -340,14 +318,14 @@ export default function GamePage() {
 
         <div className="action-grid">
           <section className="action-card">
-            <div className="eyebrow">{copy.game.nightActions}</div>
-            <h3>{copy.game.chooseQuietly}</h3>
+            <div className="eyebrow">Night Actions</div>
+            <h3>Choose Quietly</h3>
             {room.phase !== "night" ? (
-              <p className="muted-text">{copy.game.nightOnly}</p>
+              <p className="muted-text">Night choices appear only during the night phase.</p>
             ) : !isAlive ? (
-              <p className="muted-text">{copy.game.eliminatedNoNight}</p>
+              <p className="muted-text">Eliminated players can no longer act at night.</p>
             ) : !isNightRole ? (
-              <p className="muted-text">{copy.game.villagersSleep}</p>
+              <p className="muted-text">Villagers sleep through the night.</p>
             ) : (
               <div className="action-list">
                 {nightTargets.map((player) => (
@@ -357,7 +335,7 @@ export default function GamePage() {
                     onClick={() => handleNightTarget(player.id)}
                   >
                     <span>{player.username}</span>
-                    <span>{room.me?.role === "seer" ? copy.game.inspect : copy.game.attack}</span>
+                    <span>{room.me?.role === "seer" ? "Inspect" : "Attack"}</span>
                   </button>
                 ))}
               </div>
@@ -365,12 +343,12 @@ export default function GamePage() {
           </section>
 
           <section className="action-card">
-            <div className="eyebrow">{copy.game.voting}</div>
-            <h3>{copy.game.publicJudgment}</h3>
+            <div className="eyebrow">Voting</div>
+            <h3>Public Judgment</h3>
             {room.phase !== "voting" ? (
-              <p className="muted-text">{copy.game.votingAfterDiscussion}</p>
+              <p className="muted-text">Voting begins after the 1 minute discussion ends.</p>
             ) : !isAlive ? (
-              <p className="muted-text">{copy.game.eliminatedCannotVote}</p>
+              <p className="muted-text">Eliminated players cannot vote.</p>
             ) : (
               <div className="action-list">
                 {alivePlayers
@@ -382,7 +360,7 @@ export default function GamePage() {
                       onClick={() => handleVoteTarget(player.id)}
                     >
                       <span>{player.username}</span>
-                      <span>{copy.game.votes(room.voteTally?.[player.id] || 0)}</span>
+                      <span>{room.voteTally?.[player.id] || 0} votes</span>
                     </button>
                   ))}
               </div>
@@ -394,8 +372,8 @@ export default function GamePage() {
       <aside className="feed-panel">
         <div className="feed-head">
           <div>
-            <div className="eyebrow">{copy.game.narratorChat}</div>
-            <h3>{copy.game.villageFeed}</h3>
+            <div className="eyebrow">Narrator & Chat</div>
+            <h3>Village Feed</h3>
           </div>
           <div className="timer-chip">{getPhaseLabel(room.phase)}</div>
         </div>
@@ -416,7 +394,11 @@ export default function GamePage() {
           <textarea
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder={canChat ? copy.game.chatPlaceholder : copy.game.chatDisabled}
+            placeholder={
+              canChat
+                ? "Share your suspicions with the village..."
+                : "Chat is disabled outside lobby, discussion, and endgame."
+            }
             disabled={!canChat || (!isAlive && room.phase !== "ended")}
           />
           <button
@@ -424,30 +406,9 @@ export default function GamePage() {
             type="submit"
             disabled={!canChat || (!isAlive && room.phase !== "ended")}
           >
-            {copy.common.send}
+            Send
           </button>
         </form>
-
-        <div className="socket-trace">
-          <div className="eyebrow">{copy.game.socketTrace}</div>
-          <div className="trace-list">
-            {eventLogs.length === 0 ? (
-              <div className="log-card">{copy.game.noSocketEvents}</div>
-            ) : (
-              eventLogs.map((log) => (
-                <article key={log.id} className="log-card">
-                  <div className="log-head">
-                    <strong>{log.eventName}</strong>
-                    <span>
-                      {getDirectionLabel(log.direction)} - {log.timestamp}
-                    </span>
-                  </div>
-                  <pre>{log.payload || copy.common.noPayload}</pre>
-                </article>
-              ))
-            )}
-          </div>
-        </div>
       </aside>
     </main>
   );
