@@ -1,5 +1,9 @@
 const PORT = Number(process.env.PORT) || 3001;
-const CLIENT_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
+const DEFAULT_CLIENT_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS || DEFAULT_CLIENT_ORIGINS.join(","))
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.4-mini";
 const MIN_PLAYERS = 4;
