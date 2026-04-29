@@ -27,18 +27,18 @@ function useCountdown(phaseEndsAt) {
 
 function toneClass(tone) {
   if (tone === "danger") {
-    return "feed-card feed-danger";
+    return "feed-entry feed-danger";
   }
 
   if (tone === "success") {
-    return "feed-card feed-success";
+    return "feed-entry feed-success";
   }
 
   if (tone === "info") {
-    return "feed-card feed-info";
+    return "feed-entry feed-info";
   }
 
-  return "feed-card";
+  return "feed-entry";
 }
 
 function getPhaseLabel(phase) {
@@ -86,6 +86,8 @@ export default function GamePage() {
   const roomCodeRef = useRef(sessionStorage.getItem("roomCode") || "");
   const roomActionRef = useRef(sessionStorage.getItem("roomAction") || "");
   const hasRequestedRef = useRef(false);
+  const lobbyFeedRef = useRef(null);
+  const gameFeedRef = useRef(null);
 
   const countdown = useCountdown(room?.phaseEndsAt ?? null);
   const alivePlayers = room?.players?.filter((player) => player.alive) || [];
@@ -164,6 +166,15 @@ export default function GamePage() {
     setPhaseMusic(room?.phase || "lobby");
   }, [room?.phase, setPhaseMusic]);
 
+  useEffect(() => {
+    const activeFeed = room?.status === "lobby" ? lobbyFeedRef.current : gameFeedRef.current;
+    if (!activeFeed) {
+      return;
+    }
+
+    activeFeed.scrollTop = activeFeed.scrollHeight;
+  }, [room?.messages, room?.status]);
+
   function leaveGame() {
     socket.disconnect();
     sessionStorage.removeItem("roomCode");
@@ -186,6 +197,18 @@ export default function GamePage() {
     setMessage("");
   }
 
+  function handleChatKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!message.trim()) {
+        return;
+      }
+
+      socket.emit("chat:send", message);
+      setMessage("");
+    }
+  }
+
   function handleStartGame() {
     socket.emit("game:start");
   }
@@ -200,11 +223,11 @@ export default function GamePage() {
 
   if (!room) {
     return (
-      <main className="shell">
-        <section className="hero-panel">
+      <main className="screen-shell">
+        <section className="connecting-card">
           <div className="eyebrow">Connecting</div>
           <h1>Preparing Room</h1>
-          <p className="hero-copy">
+          <p className="muted-text">
             {error || "Connecting to the werewolf server and waiting for room state."}
           </p>
         </section>
@@ -215,208 +238,329 @@ export default function GamePage() {
   const canStart = room.me?.isHost && room.status === "lobby" && room.players.length >= 4;
   const canChat = room.phase === "lobby" || room.phase === "discussion" || room.phase === "ended";
   const isAlive = room.me?.alive;
+  const myRole = room.me?.role;
   const isNightRole = room.me?.role === "werewolf" || room.me?.role === "seer";
   const nightTargets = alivePlayers.filter((player) => player.id !== room.me?.id);
+  const isVotingPhase = room.phase === "voting";
+  const canShowNightChoices = room.phase === "night" && isAlive && isNightRole;
+  const canShowVotingChoices = isVotingPhase && isAlive;
+  const boardGridClassName =
+    myRole === "villager" || (!canShowNightChoices && !canShowVotingChoices)
+      ? "board-grid board-grid-feed-wide"
+      : "board-grid";
 
-  return (
-    <main className="game-shell">
-      <aside className="sidebar">
-        <div className="room-header">
-          <div>
-            <div className="eyebrow">Room Code</div>
-            <div className="room-code">{room.code}</div>
-          </div>
-          <button className="ghost-btn" onClick={leaveGame}>
-            Leave
+  let actionTitle = "Village Status";
+  let actionLabel = "Wait for the next important moment in the round.";
+  let actionContent = <p className="muted-text">No action is needed right now.</p>;
+
+  if (canShowVotingChoices) {
+    actionTitle = "Voting";
+    actionLabel = "Public judgment decides who leaves before night returns.";
+    actionContent = (
+      <div className="action-stack">
+        {alivePlayers
+          .filter((player) => player.id !== room.me?.id)
+          .map((player) => (
+            <button
+              key={player.id}
+              className={room.myVoteTargetId === player.id ? "target-btn selected" : "target-btn"}
+              onClick={() => handleVoteTarget(player.id)}
+            >
+              <span className="target-avatar">{player.username[0]?.toUpperCase()}</span>
+              <span>{player.username}</span>
+              <span className="vote-count">{room.voteTally?.[player.id] || 0} votes</span>
+            </button>
+          ))}
+      </div>
+    );
+  } else if (canShowNightChoices) {
+    actionTitle = myRole === "seer" ? "Seer Action" : "Werewolf Action";
+    actionLabel =
+      myRole === "seer"
+        ? "Choose one player to inspect before sunrise."
+        : "Choose quietly who the pack will attack tonight.";
+    actionContent = (
+      <div className="action-stack">
+        {nightTargets.map((player) => (
+          <button
+            key={player.id}
+            className={room.myNightChoice === player.id ? "target-btn selected" : "target-btn"}
+            onClick={() => handleNightTarget(player.id)}
+          >
+            <span className="target-avatar">{player.username[0]?.toUpperCase()}</span>
+            <span>{player.username}</span>
+            <span className="target-meta">{myRole === "seer" ? "Inspect" : "Attack"}</span>
           </button>
-        </div>
+        ))}
+      </div>
+    );
+  } else if (!isAlive) {
+    actionTitle = "Observer";
+    actionLabel = "You have been eliminated from the round.";
+    actionContent = <p className="muted-text">You can still follow the discussion, but you cannot act.</p>;
+  } else if (room.phase === "night") {
+    actionTitle = "Night Falls";
+    actionLabel = "Villagers sleep while special roles act in secret.";
+    actionContent = <p className="muted-text">No night action is available for your role.</p>;
+  } else if (room.phase === "discussion") {
+    actionTitle = "Discussion";
+    actionLabel = "Use the village feed to share suspicions and read the room.";
+    actionContent = <p className="muted-text">There is no separate action here. Focus on the conversation.</p>;
+  } else if (room.phase === "ended") {
+    actionTitle = "Game Ended";
+    actionLabel = "The round is over.";
+    actionContent = <p className="muted-text">Review the final discussion or leave the room when you are ready.</p>;
+  }
 
-        <div className="role-card">
-          <div className="eyebrow">Your Role</div>
-          <div className="role-name">{getRoleLabel(room.me?.role)}</div>
-          <div className="role-status">{room.me?.alive ? "Alive" : "Eliminated"}</div>
-        </div>
+  if (room.status === "lobby") {
+    return (
+      <main className="screen-shell">
+        <section className="waiting-layout">
+          <div className="waiting-main">
+            <article className="waiting-card waiting-hero">
+              <div className="eyebrow">Waiting Room</div>
+              <h1>Gather The Village</h1>
+              <div className="waiting-code">{room.code}</div>
+              <p className="muted-text">Share this code so the rest of the players can enter the room.</p>
 
-        {privateNote ? (
-          <div className="private-card">
-            <div className="eyebrow">Private Note</div>
-            <p>{privateNote}</p>
-          </div>
-        ) : room.me?.nightResult ? (
-          <div className="private-card">
-            <div className="eyebrow">Private Note</div>
-            <p>{room.me.nightResult}</p>
-          </div>
-        ) : null}
-
-        <div className="player-list">
-          <div className="eyebrow">Players</div>
-          {room.players.map((player) => (
-            <article key={player.id} className="player-card">
-              <div className="player-top">
-                <strong>
-                  {player.username}
-                  {player.id === room.me?.id ? " (You)" : ""}
-                </strong>
-                <span className={player.alive ? "alive-pill" : "dead-pill"}>
-                  {player.alive ? "Alive" : "Out"}
-                </span>
+              <div className="waiting-meta">
+                <span className="meta-pill">{room.players.length} players</span>
+                <span className="meta-pill">{room.me?.isHost ? "You are host" : "Waiting for host"}</span>
               </div>
-              <div className="player-meta">
-                {player.isHost ? "Host" : "Player"}
-                {room.status === "ended" && player.role ? ` - ${getRoleLabel(player.role)}` : ""}
+
+              <div className="waiting-actions">
+                {canStart ? (
+                  <button className="btn-primary" onClick={handleStartGame}>
+                    Start Game
+                  </button>
+                ) : (
+                  <div className="waiting-hint">
+                    {room.me?.isHost
+                      ? "Need at least 4 players before the match can begin."
+                      : "The host will start the match when everyone is ready."}
+                  </div>
+                )}
+
+                <button className="btn-ghost" onClick={leaveGame}>
+                  Leave Room
+                </button>
               </div>
             </article>
-          ))}
-        </div>
-      </aside>
 
-      <section className="main-stage">
-        <div className="phase-card">
-          <div className="phase-copy">
-            <div className="eyebrow">Phase</div>
-            <h2>{getPhaseLabel(room.phase)}</h2>
-            <p>{room.narration}</p>
-          </div>
-          <div className="phase-side">
-            <div className="timer-label">
-              {room.phaseEndsAt ? `${countdown}s left` : getStatusLabel(room.status)}
-            </div>
-            {canStart ? (
-              <button className="primary-btn" onClick={handleStartGame}>
-                Start Game
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {error ? <div className="error-banner stage-error">{error}</div> : null}
-
-        <section className="action-card">
-          <div className="eyebrow">Socket Summary</div>
-          <h3>Server Broadcast Preview</h3>
-          <div className="summary-grid">
-            <div className="summary-item">
-              <span>Room</span>
-              <strong>{roomSummary?.code || room.code}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Status</span>
-              <strong>{getStatusLabel(roomSummary?.status || room.status)}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Phase</span>
-              <strong>{getPhaseLabel(roomSummary?.phase || room.phase)}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Players</span>
-              <strong>{roomSummary?.playerCount || room.players.length}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Alive</span>
-              <strong>{roomSummary?.aliveCount || room.aliveCount}</strong>
-            </div>
-            <div className="summary-item">
-              <span>Round</span>
-              <strong>{roomSummary?.round || room.round}</strong>
-            </div>
-          </div>
-        </section>
-
-        <div className="action-grid">
-          <section className="action-card">
-            <div className="eyebrow">Night Actions</div>
-            <h3>Choose Quietly</h3>
-            {room.phase !== "night" ? (
-              <p className="muted-text">Night choices appear only during the night phase.</p>
-            ) : !isAlive ? (
-              <p className="muted-text">Eliminated players can no longer act at night.</p>
-            ) : !isNightRole ? (
-              <p className="muted-text">Villagers sleep through the night.</p>
-            ) : (
-              <div className="action-list">
-                {nightTargets.map((player) => (
-                  <button
-                    key={player.id}
-                    className={room.myNightChoice === player.id ? "action-btn selected" : "action-btn"}
-                    onClick={() => handleNightTarget(player.id)}
-                  >
-                    <span>{player.username}</span>
-                    <span>{room.me?.role === "seer" ? "Inspect" : "Attack"}</span>
-                  </button>
+            <article className="waiting-card">
+              <div className="section-title">Players</div>
+              <div className="player-grid">
+                {room.players.map((player) => (
+                  <div key={player.id} className={player.id === room.me?.id ? "player-chip me" : "player-chip"}>
+                    <span className="player-avatar">{player.username[0]?.toUpperCase()}</span>
+                    <div className="player-chip-copy">
+                      <strong>{player.username}</strong>
+                      <small>{player.isHost ? "Room host" : "Villager"}</small>
+                    </div>
+                    {player.isHost ? <span className="badge-host">Host</span> : null}
+                    {player.id === room.me?.id ? <span className="badge-me">You</span> : null}
+                  </div>
                 ))}
               </div>
-            )}
-          </section>
+            </article>
 
-          <section className="action-card">
-            <div className="eyebrow">Voting</div>
-            <h3>Public Judgment</h3>
-            {room.phase !== "voting" ? (
-              <p className="muted-text">Voting begins after the 1 minute discussion ends.</p>
-            ) : !isAlive ? (
-              <p className="muted-text">Eliminated players cannot vote.</p>
-            ) : (
-              <div className="action-list">
-                {alivePlayers
-                  .filter((player) => player.id !== room.me?.id)
-                  .map((player) => (
-                    <button
-                      key={player.id}
-                      className={room.myVoteTargetId === player.id ? "action-btn selected" : "action-btn"}
-                      onClick={() => handleVoteTarget(player.id)}
-                    >
-                      <span>{player.username}</span>
-                      <span>{room.voteTally?.[player.id] || 0} votes</span>
-                    </button>
-                  ))}
+            <article className="waiting-card">
+              <div className="section-title">Roles In This Match</div>
+              <div className="role-preview">
+                <span className="role-chip role-werewolf">Werewolf</span>
+                <span className="role-chip role-seer">Seer</span>
+                {room.players.length > 2
+                  ? Array.from({ length: Math.max(1, room.players.length - 2) }).map((_, index) => (
+                      <span key={index} className="role-chip role-villager">
+                        Villager
+                      </span>
+                    ))
+                  : null}
               </div>
-            )}
-          </section>
+            </article>
+          </div>
+
+          <aside className="waiting-sidebar">
+            <article className="waiting-card chat-card">
+            <div className="section-title">Lobby Chat</div>
+            <div className="feed-list" ref={lobbyFeedRef}>
+              {room.messages.length === 0 ? (
+                <p className="chat-empty">No messages yet. Say hello to the village.</p>
+              ) : (
+                room.messages.map((entry) => (
+                  <article
+                    key={entry.id}
+                    className={entry.from === "Gemini Narrator" ? toneClass(entry.tone) : "feed-entry"}
+                  >
+                    <strong>{entry.from}</strong>
+                    <p>{entry.text}</p>
+                  </article>
+                ))
+              )}
+            </div>
+
+            <form className="chat-input-row" onSubmit={submitChat}>
+              <textarea
+                className="chat-input"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                onKeyDown={handleChatKeyDown}
+                placeholder="Chat with the room before the game starts..."
+                disabled={!canChat}
+              />
+              <button className="btn-primary chat-send" type="submit" disabled={!canChat}>
+                Send
+              </button>
+            </form>
+            </article>
+          </aside>
+
+          {error ? <div className="error-banner">{error}</div> : null}
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="screen-shell">
+      <section className="game-layout">
+        <div className="status-strip">
+          <div className="status-group">
+            <span className="phase-badge">{getPhaseLabel(room.phase)}</span>
+            <span className="my-role-badge">{getRoleLabel(room.me?.role)}</span>
+            <span className="status-pill">{getStatusLabel(room.status)}</span>
+            {!isAlive ? <span className="dead-badge">Eliminated</span> : null}
+          </div>
+          <div className="status-group">
+            <span className="timer-chip">{room.phaseEndsAt ? `${countdown}s left` : "No timer"}</span>
+            <button className="btn-ghost" onClick={leaveGame}>
+              Leave Room
+            </button>
+          </div>
+        </div>
+
+        <article className="story-card">
+          <div className="eyebrow">Narration</div>
+          <p className="story-copy">{room.narration || "The village waits for the next turn."}</p>
+        </article>
+
+        {privateNote || room.me?.nightResult ? (
+          <article className="alert-card">
+            <div className="section-title">Private Note</div>
+            <p className="private-copy">{privateNote || room.me?.nightResult}</p>
+          </article>
+        ) : null}
+
+        {error ? <div className="error-banner">{error}</div> : null}
+
+        <div className={boardGridClassName}>
+          <div className="left-column">
+            <aside className="player-panel player-panel-large">
+              <div className="section-title">Players</div>
+              <div className="player-list">
+                {room.players.map((player) => (
+                  <div
+                    key={player.id}
+                    className={
+                      player.id === room.me?.id
+                        ? player.alive
+                          ? "player-row me"
+                          : "player-row me dead"
+                        : player.alive
+                          ? "player-row"
+                          : "player-row dead"
+                    }
+                  >
+                    <span className="player-avatar-sm">{player.username[0]?.toUpperCase()}</span>
+                    <div className="player-row-copy">
+                      <strong>{player.username}</strong>
+                      <small>
+                        {player.id === room.me?.id ? "You" : "Player"}{player.isHost ? " | Host" : ""}
+                      </small>
+                    </div>
+                    {!player.alive ? <span className="dead-icon">X</span> : <span className="alive-pill">Alive</span>}
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </div>
+
+          <div className="center-column">
+            <article className="phase-overview phase-overview-compact">
+              <div>
+                <div className="eyebrow">Current Phase</div>
+                <h1>{getPhaseLabel(room.phase)}</h1>
+                <p className="muted-text">
+                  Room {room.code} | Round {room.round || 1} | {getStatusLabel(room.status)}
+                </p>
+              </div>
+              <div className="summary-grid summary-grid-inline">
+                <div className="stat-card">
+                  <span>Alive</span>
+                  <strong>{roomSummary?.aliveCount || room.aliveCount || alivePlayers.length}</strong>
+                </div>
+                <div className="stat-card">
+                  <span>Players</span>
+                  <strong>{roomSummary?.playerCount || room.players.length}</strong>
+                </div>
+                <div className="stat-card">
+                  <span>Phase</span>
+                  <strong>{getPhaseLabel(roomSummary?.phase || room.phase)}</strong>
+                </div>
+              </div>
+            </article>
+
+            <article className="action-card">
+              <div className="section-title">{actionTitle}</div>
+              <p className="action-label">{actionLabel}</p>
+              {actionContent}
+            </article>
+          </div>
+
+          <div className="secondary-column">
+            <aside className="chat-card village-feed-card">
+              <div className="section-title">Village Feed</div>
+              <div className="feed-list" ref={gameFeedRef}>
+                {room.messages.length === 0 ? (
+                  <p className="chat-empty">No messages yet. Start the discussion.</p>
+                ) : (
+                  room.messages.map((entry) => (
+                    <article
+                      key={entry.id}
+                      className={entry.from === "Gemini Narrator" ? toneClass(entry.tone) : "feed-entry"}
+                    >
+                      <strong>{entry.from}</strong>
+                      <p>{entry.text}</p>
+                    </article>
+                  ))
+                )}
+              </div>
+
+              <form className="chat-input-row" onSubmit={submitChat}>
+                <textarea
+                  className="chat-input"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  onKeyDown={handleChatKeyDown}
+                  placeholder={
+                    canChat
+                      ? "Share your suspicions with the village..."
+                      : "Chat is disabled outside lobby, discussion, and endgame."
+                  }
+                  disabled={!canChat || (!isAlive && room.phase !== "ended")}
+                />
+                <button
+                  className="btn-primary chat-send"
+                  type="submit"
+                  disabled={!canChat || (!isAlive && room.phase !== "ended")}
+                >
+                  Send
+                </button>
+              </form>
+            </aside>
+          </div>
         </div>
       </section>
-
-      <aside className="feed-panel">
-        <div className="feed-head">
-          <div>
-            <div className="eyebrow">Narrator & Chat</div>
-            <h3>Village Feed</h3>
-          </div>
-          <div className="timer-chip">{getPhaseLabel(room.phase)}</div>
-        </div>
-
-        <div className="feed-list">
-          {room.messages.map((entry) => (
-            <article
-              key={entry.id}
-              className={entry.from === "Gemini Narrator" ? toneClass(entry.tone) : "feed-card"}
-            >
-              <strong>{entry.from}</strong>
-              <p>{entry.text}</p>
-            </article>
-          ))}
-        </div>
-
-        <form className="chat-form" onSubmit={submitChat}>
-          <textarea
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            placeholder={
-              canChat
-                ? "Share your suspicions with the village..."
-                : "Chat is disabled outside lobby, discussion, and endgame."
-            }
-            disabled={!canChat || (!isAlive && room.phase !== "ended")}
-          />
-          <button
-            className="primary-btn"
-            type="submit"
-            disabled={!canChat || (!isAlive && room.phase !== "ended")}
-          >
-            Send
-          </button>
-        </form>
-      </aside>
     </main>
   );
 }

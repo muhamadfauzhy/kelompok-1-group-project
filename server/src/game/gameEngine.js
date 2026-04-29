@@ -357,7 +357,7 @@ function createGameEngine({ io, roomStore, narrator }) {
       details: {
         round: room.round,
         killedPlayer: killedPlayer ? killedPlayer.username : null,
-        durationSeconds: 180,
+        durationSeconds: Math.floor(PHASE_DURATION_MS[PHASE.DISCUSSION] / 1000),
       },
       fallbackText: killedPlayer
         ? `${killedPlayer.username} was found lifeless at sunrise. The village must talk before fear chooses another victim.`

@@ -1,7 +1,7 @@
 const PORT = Number(process.env.PORT) || 3001;
 const CLIENT_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.4-mini";
 const MIN_PLAYERS = 4;
 const MAX_MESSAGES = 80;
 
@@ -26,9 +26,9 @@ const STATUS = {
 };
 
 const PHASE_DURATION_MS = {
-  [PHASE.NIGHT]: 25_000,
-  [PHASE.DISCUSSION]: 60_000,
-  [PHASE.VOTING]: 25_000,
+  [PHASE.NIGHT]: 30_000,
+  [PHASE.DISCUSSION]: 90_000,
+  [PHASE.VOTING]: 30_000,
 };
 
 const CHAT_ENABLED_PHASES = new Set([PHASE.LOBBY, PHASE.DISCUSSION, PHASE.ENDED]);
@@ -37,8 +37,8 @@ const NIGHT_ROLES = new Set([ROLE.WEREWOLF, ROLE.SEER]);
 module.exports = {
   PORT,
   CLIENT_ORIGINS,
-  GEMINI_API_KEY,
-  GEMINI_MODEL,
+  OPENAI_API_KEY,
+  OPENAI_MODEL,
   MIN_PLAYERS,
   MAX_MESSAGES,
   ROLE,
