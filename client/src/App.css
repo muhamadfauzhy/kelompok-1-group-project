@@ -51,6 +51,13 @@ textarea {
     linear-gradient(160deg, rgba(18, 10, 8, 0.94), rgba(9, 11, 19, 0.98));
 }
 
+.language-floating {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 20;
+}
+
 .entry-panel {
   padding: 3rem;
   display: grid;
@@ -221,6 +228,67 @@ textarea {
 .ghost-btn:hover,
 .action-btn:hover {
   transform: translateY(-1px);
+}
+
+.language-toggle-wrap {
+  display: inline-grid;
+  justify-items: end;
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border-radius: 0.9rem;
+  background: rgba(8, 12, 23, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+}
+
+.language-label {
+  padding-inline: 0.2rem;
+  color: #f8b26a;
+  font-size: 0.58rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.language-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.2rem;
+  padding: 0.16rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.lang-btn {
+  min-width: 2.3rem;
+  border: none;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease, background 160ms ease;
+  padding: 0.38rem 0.58rem;
+  border-radius: 999px;
+  background: transparent;
+  color: #bfc8d9;
+  font-weight: 700;
+  font-size: 0.7rem;
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
+
+.lang-btn:hover {
+  transform: translateY(-1px);
+}
+
+.lang-btn.active {
+  background: linear-gradient(135deg, #ff9447, #ff6a2d);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(255, 106, 45, 0.22);
+}
+
+.lang-btn:focus-visible {
+  outline: 2px solid rgba(255, 200, 154, 0.9);
+  outline-offset: 2px;
 }
 
 .status-label,
@@ -531,9 +599,19 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .hero-panel,
+.hero-panel,
   .entry-panel,
   .game-shell {
     padding: 1rem;
+  }
+
+  .room-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .language-floating {
+    left: 0.75rem;
+    bottom: 0.75rem;
   }
 }

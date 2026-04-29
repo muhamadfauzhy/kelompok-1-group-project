@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useNavigate } from "react-router";
+import { LanguageContext } from "../context/languageContext";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { copy } = useContext(LanguageContext);
   const [username, setUsername] = useState(sessionStorage.getItem("username") || "");
   const [roomCode, setRoomCode] = useState(sessionStorage.getItem("roomCode") || "");
   const [error, setError] = useState("");
@@ -12,12 +14,12 @@ export default function HomePage() {
     const normalizedRoomCode = roomCode.trim().toUpperCase();
 
     if (!trimmedUsername) {
-      setError("Username wajib diisi.");
+      setError(copy.home.usernameRequired);
       return;
     }
 
     if (action === "join" && !normalizedRoomCode) {
-      setError("Room code wajib diisi untuk join.");
+      setError(copy.home.roomCodeRequired);
       return;
     }
 
@@ -31,72 +33,59 @@ export default function HomePage() {
   return (
     <main className="shell">
       <section className="hero-panel">
-        <div className="eyebrow">Realtime Werewolf</div>
-        <h1>Gemini Narrated Village</h1>
-        <p className="hero-copy">
-          Create a room, invite players, and survive the night. The game uses Express +
-          Socket.IO and gives Gemini the role of narrator for major phase transitions and
-          outcomes.
-        </p>
+        <div className="eyebrow">{copy.home.heroEyebrow}</div>
+        <h1>{copy.home.heroTitle}</h1>
+        <p className="hero-copy">{copy.home.heroCopy}</p>
         <div className="feature-grid">
-          <article className="feature-card">
-            <h2>Role Set</h2>
-            <p>Only three roles are used: Villager, Seer, and Werewolf.</p>
-          </article>
-          <article className="feature-card">
-            <h2>Timed Phases</h2>
-            <p>Day discussion runs for 1 minute exactly, then the vote opens.</p>
-          </article>
-          <article className="feature-card">
-            <h2>Realtime Rooms</h2>
-            <p>Create or join a room code and sync gameplay live for every player.</p>
-          </article>
+          {copy.home.features.map((feature) => (
+            <article key={feature.title} className="feature-card">
+              <h2>{feature.title}</h2>
+              <p>{feature.body}</p>
+            </article>
+          ))}
         </div>
       </section>
 
       <section className="entry-panel">
         <div className="entry-card">
-          <div className="eyebrow">Identity</div>
-          <h2>Enter The Village</h2>
+          <div className="eyebrow">{copy.home.identityEyebrow}</div>
+          <h2>{copy.home.entryTitle}</h2>
           <label className="field">
-            <span>Username</span>
+            <span>{copy.home.usernameLabel}</span>
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              placeholder="Mis. Jefry"
+              placeholder={copy.home.usernamePlaceholder}
             />
           </label>
           <div className="entry-actions">
             <button className="primary-btn" onClick={() => goToGame("create")}>
-              Create Room
+              {copy.home.createRoom}
             </button>
           </div>
         </div>
 
         <div className="entry-card secondary">
-          <div className="eyebrow">Join</div>
-          <h2>Already Have A Room?</h2>
+          <div className="eyebrow">{copy.home.joinEyebrow}</div>
+          <h2>{copy.home.joinTitle}</h2>
           <label className="field">
-            <span>Room Code</span>
+            <span>{copy.home.roomCodeLabel}</span>
             <input
               value={roomCode}
               onChange={(event) => setRoomCode(event.target.value.toUpperCase())}
-              placeholder="ABCDE"
+              placeholder={copy.home.roomCodePlaceholder}
             />
           </label>
           <div className="entry-actions">
             <button className="secondary-btn" onClick={() => goToGame("join")}>
-              Join Room
+              {copy.home.joinRoom}
             </button>
           </div>
         </div>
 
         <div className="status-card">
-          <div className="status-label">Ready</div>
-          <p>
-            Minimum 4 players. Host starts the match, roles are randomized, and each player
-            gets their private role through socket state.
-          </p>
+          <div className="status-label">{copy.home.readyLabel}</div>
+          <p>{copy.home.readyCopy}</p>
           {error ? <div className="error-banner">{error}</div> : null}
         </div>
       </section>

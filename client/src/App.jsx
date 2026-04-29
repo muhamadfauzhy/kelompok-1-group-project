@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router";
 import "./App.css";
+import LanguageToggle from "./components/LanguageToggle";
 import GameAIPage from "./views/GameAIPage";
 import GamePage from "./views/GamePage";
 import HomePage from "./views/HomePage";
@@ -12,6 +13,9 @@ export default function App() {
         <Route path="/game" element={<GamePage />} />
         <Route path="/game-ai" element={<GameAIPage />} />
       </Routes>
+      <div className="language-floating">
+        <LanguageToggle />
+      </div>
     </BrowserRouter>
   );
 }
