@@ -1,3 +1,36 @@
+:root {
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: #d9dee7;
+  background:
+    radial-gradient(circle at top, rgba(255, 119, 57, 0.18), transparent 26%),
+    linear-gradient(160deg, #120c09 0%, #111724 55%, #080a10 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-width: 320px;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
 .shell,
 .game-shell {
   min-height: 100vh;
