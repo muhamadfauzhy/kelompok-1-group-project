@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { useMusicContext } from "../contexts/MusicContext";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { setPhaseMusic } = useMusicContext();
   const [username, setUsername] = useState(sessionStorage.getItem("username") || "");
   const [roomCode, setRoomCode] = useState(sessionStorage.getItem("roomCode") || "");
   const [error, setError] = useState("");
@@ -24,6 +26,7 @@ export default function HomePage() {
     sessionStorage.setItem("username", trimmedUsername);
     sessionStorage.setItem("roomCode", normalizedRoomCode);
     sessionStorage.setItem("roomAction", action);
+    setPhaseMusic("lobby");
     setError("");
     navigate("/game");
   }

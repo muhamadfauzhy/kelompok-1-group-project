@@ -51,13 +51,6 @@ textarea {
     linear-gradient(160deg, rgba(18, 10, 8, 0.94), rgba(9, 11, 19, 0.98));
 }
 
-.language-floating {
-  position: fixed;
-  left: 1rem;
-  bottom: 1rem;
-  z-index: 20;
-}
-
 .entry-panel {
   padding: 3rem;
   display: grid;
@@ -320,6 +313,55 @@ textarea {
   background: rgba(255, 94, 120, 0.16);
   border: 1px solid rgba(255, 94, 120, 0.22);
   color: #ffd6de;
+}
+
+.music-floating {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 30;
+}
+
+.music-panel {
+  width: min(320px, calc(100vw - 2rem));
+  padding: 1rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(14, 16, 28, 0.92);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(18px);
+}
+
+.music-panel strong,
+.music-panel small {
+  display: block;
+}
+
+.music-panel strong {
+  color: #fff8ef;
+  text-transform: uppercase;
+}
+
+.music-panel p,
+.music-panel small,
+.music-note {
+  color: #c5cad6;
+}
+
+.music-panel p,
+.music-panel small,
+.music-note,
+.music-error {
+  margin-top: 0.5rem;
+}
+
+.music-error {
+  color: #ffd6de;
+}
+
+.music-btn {
+  width: 100%;
+  margin-top: 0.85rem;
 }
 
 .game-shell {

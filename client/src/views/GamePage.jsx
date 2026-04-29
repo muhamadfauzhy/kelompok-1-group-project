@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { useMusicContext } from "../contexts/MusicContext";
 import { socket } from "../socket/socket";
 
 function useCountdown(phaseEndsAt) {
@@ -44,8 +45,9 @@ function getPhaseLabel(phase) {
   const labels = {
     lobby: "LOBBY",
     night: "NIGHT",
-    discussion: "DISCUSSION",
-    voting: "VOTING",
+    discussion: "DAY",
+    voting: "DAY",
+    day: "DAY",
     ended: "ENDED",
   };
 
@@ -74,6 +76,7 @@ function getRoleLabel(role) {
 
 export default function GamePage() {
   const navigate = useNavigate();
+  const { setPhaseMusic } = useMusicContext();
   const [room, setRoom] = useState(null);
   const [roomSummary, setRoomSummary] = useState(null);
   const [message, setMessage] = useState("");
@@ -156,6 +159,10 @@ export default function GamePage() {
       socket.disconnect();
     };
   }, [navigate]);
+
+  useEffect(() => {
+    setPhaseMusic(room?.phase || "lobby");
+  }, [room?.phase, setPhaseMusic]);
 
   function leaveGame() {
     socket.disconnect();
