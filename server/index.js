@@ -8,8 +8,10 @@ const { createRoomStore } = require("./src/store/roomStore");
 const { createOpenAINarrator } = require("./src/services/openaiNarrator");
 const { createGameEngine } = require("./src/game/gameEngine");
 const { registerSocketHandlers } = require("./src/socket/registerSocketHandlers");
+const cors = require('cors')
 
 const app = express();
+app.use(cors())
 
 const server = createServer(app);
 const io = new Server(server, {
